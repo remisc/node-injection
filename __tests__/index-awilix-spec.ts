@@ -25,6 +25,7 @@ class App {
 
 interface IMasterService {
     do(): string;
+    close(): void;
 }
 
 class MasterService implements IMasterService {
@@ -37,6 +38,11 @@ class MasterService implements IMasterService {
     public do(): string {
         this.i++;
         return `master-${this.i}`;
+    }
+
+    public close(): void {
+        console.log('app close');
+        throw new Error('close_failure');
     }
 }
 
@@ -54,13 +60,14 @@ test('Use app with transient dependency', () => {
 
     app = container.resolve<App>('app');
     expect(app.run()).toEqual('app-1-master-1');
+
 });
 
-test('Use app with singleton dependency', () => {
+test('Use app with singleton dependency', async () => {
 
     const container = createContainer();
     container.register({
-        masterService: asClass(MasterService).singleton(),
+        masterService: asClass(MasterService).disposer(_ => _.close() ).singleton(),
         app: asClass(App),
     });
 
@@ -70,4 +77,6 @@ test('Use app with singleton dependency', () => {
 
     app = container.resolve<App>('app');
     expect(app.run()).toEqual('app-1-master-2');
+
+    await expect(container.dispose()).rejects.toThrow('close_failure');
 });
